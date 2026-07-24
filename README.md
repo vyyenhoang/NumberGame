@@ -1,5 +1,7 @@
 # 🃏 Number Clash — Team Card Duel
 
+**▶️ Play now: https://vyyenhoang.github.io/NumberGame/**
+
 A free, no-server party game for **two teams** (up to 6 players each). Each team holds two sets of cards **1–7** (14 cards). Every round both teams secretly pick **2 cards** — the bigger sum scores the point, then the **big cards switch sides** and the small ones are discarded. Once per game a team can play its **🎭 hidden advantage**. 12 rounds, chess-clock timing, and if the score is a draw, **the faster team wins**.
 
 **Play it in a browser — phones work great.** No accounts, no backend, 100% free hosting on GitHub Pages.
