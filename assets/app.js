@@ -127,7 +127,7 @@ function startPick() {
     G.pickStartAt = { A: null, B: null };
   } else {
     const t = now();
-    G.phaseEndsAt = t + G.settings.pickSec * 1000;
+    G.phaseEndsAt = G.settings.pickSec > 0 ? t + G.settings.pickSec * 1000 : null;
     G.pickStartAt = { A: t, B: t };
   }
   pushState();
@@ -137,7 +137,7 @@ function beginHotTurn(team) {
   if (G.phase !== "pick" || G.hotActive !== team || G.pickStartAt[team]) return;
   const t = now();
   G.pickStartAt[team] = t;
-  G.phaseEndsAt = t + G.settings.pickSec * 1000;
+  G.phaseEndsAt = G.settings.pickSec > 0 ? t + G.settings.pickSec * 1000 : null;
   pushState();
 }
 
@@ -248,8 +248,8 @@ function endGame(reason) {
 function engineTick() {
   if (!G || G.phase === "lobby" || G.phase === "over") return;
   const t = now();
-  // total game limit
-  if (G.startedAt && t - G.startedAt >= G.settings.totalMin * 60000) {
+  // total game limit (0 = no limit)
+  if (G.startedAt && G.settings.totalMin > 0 && t - G.startedAt >= G.settings.totalMin * 60000) {
     // teams mid-pick keep accrued time
     for (const k of ["A", "B"]) {
       const s = G.pickStartAt[k];
@@ -318,8 +318,8 @@ function applyAction(team, a) {
       if (team !== "A" || G.phase !== "lobby") return;
       const s = a.s || {};
       G.settings.discussSec = [0, 30, 45, 60, 90, 120].includes(+s.discussSec) ? +s.discussSec : G.settings.discussSec;
-      G.settings.pickSec = [15, 20, 30, 45, 60].includes(+s.pickSec) ? +s.pickSec : G.settings.pickSec;
-      G.settings.totalMin = [10, 15, 20, 30, 45].includes(+s.totalMin) ? +s.totalMin : G.settings.totalMin;
+      G.settings.pickSec = [0, 15, 20, 30, 45, 60].includes(+s.pickSec) ? +s.pickSec : G.settings.pickSec;
+      G.settings.totalMin = [0, 10, 15, 20, 30, 45].includes(+s.totalMin) ? +s.totalMin : G.settings.totalMin;
       pushState(); break;
     case "start":
       if (team !== "A" || G.phase !== "lobby") return;
@@ -745,7 +745,8 @@ function renderOverlays(me) {
     const T = V.teams[V.hotActive];
     $("#pass-emoji").textContent = V.hotActive === "A" ? "🔥" : "🐉";
     $("#pass-title").textContent = `${T.name} — your turn!`;
-    $("#pass-text").textContent = `Pass the device to ${T.name}. Other team, look away! 👀 Tap below when only ${T.name} can see the screen. Your pick timer (${V.settings.pickSec}s) starts then.`;
+    const pickInfo = V.settings.pickSec > 0 ? `Your pick timer (${V.settings.pickSec}s) starts then.` : "Your thinking clock starts then (no time limit).";
+    $("#pass-text").textContent = `Pass the device to ${T.name}. Other team, look away! 👀 Tap below when only ${T.name} can see the screen. ${pickInfo}`;
     $("#pass-continue").onclick = () => { sel = []; act({ t: "beginTurn", team: V.hotActive }); };
     pass.classList.add("show");
   } else pass.classList.remove("show");
@@ -870,13 +871,15 @@ function uiTick() {
     el.textContent = fmtClock(remain);
     el.classList.toggle("hurry", remain < 10000 && (V.phase === "discuss" || V.phase === "pick"));
   } else {
-    el.textContent = V.phase === "pick" ? "⏸" : "—";
+    el.textContent = V.phase === "pick" ? (V.settings.pickSec <= 0 ? "∞" : "⏸") : "—";
     el.classList.remove("hurry");
   }
-  // total bar
-  if (V.startedAt) {
+  // total bar (hidden when no game limit)
+  if (V.startedAt && V.settings.totalMin > 0) {
     const frac = Math.min(1, (t - V.startedAt) / (V.settings.totalMin * 60000));
     $("#totalbar-fill").style.width = (frac * 100).toFixed(1) + "%";
+  } else {
+    $("#totalbar-fill").style.width = "0%";
   }
   // team clocks (live accrual while picking)
   for (const k of ["A", "B"]) {
