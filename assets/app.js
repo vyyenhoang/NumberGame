@@ -113,6 +113,7 @@ function startDiscuss() {
   G.teams.A.ready = G.teams.B.ready = false;
   G.teams.A.pick = G.teams.B.pick = null;
   G.hotActive = null;
+  if (G.settings.discussSec <= 0) return startPick(); // discussion turned off
   G.phaseEndsAt = now() + G.settings.discussSec * 1000;
   pushState();
 }
@@ -316,7 +317,7 @@ function applyAction(team, a) {
     case "settings":
       if (team !== "A" || G.phase !== "lobby") return;
       const s = a.s || {};
-      G.settings.discussSec = [30, 45, 60, 90, 120].includes(+s.discussSec) ? +s.discussSec : G.settings.discussSec;
+      G.settings.discussSec = [0, 30, 45, 60, 90, 120].includes(+s.discussSec) ? +s.discussSec : G.settings.discussSec;
       G.settings.pickSec = [15, 20, 30, 45, 60].includes(+s.pickSec) ? +s.pickSec : G.settings.pickSec;
       G.settings.totalMin = [10, 15, 20, 30, 45].includes(+s.totalMin) ? +s.totalMin : G.settings.totalMin;
       pushState(); break;
