@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Number Clash — Team Card Duel</title>
+<meta name="description" content="A 2-team number card duel. Join a room by code or QR, pick two cards, biggest sum wins!">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🃏</text></svg>">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============ HOME ============ -->
+  <section id="screen-home" class="screen active">
+    <div class="home-hero">
+      <div class="logo-art">
+        <svg viewBox="0 0 320 180" class="logo-svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="lgA" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#ff8a70"/><stop offset="1" stop-color="#ff5252"/>
+            </linearGradient>
+            <linearGradient id="lgB" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#4fd8c6"/><stop offset="1" stop-color="#1ba098"/>
+            </linearGradient>
+          </defs>
+          <g transform="translate(70 90) rotate(-14)">
+            <rect x="-38" y="-54" width="76" height="108" rx="12" fill="url(#lgA)" stroke="#fff" stroke-width="4"/>
+            <text x="0" y="16" text-anchor="middle" font-size="52" font-weight="900" fill="#fff" font-family="inherit">7</text>
+            <circle cx="-24" cy="-38" r="6" fill="#ffffff88"/>
+          </g>
+          <g transform="translate(250 90) rotate(14)">
+            <rect x="-38" y="-54" width="76" height="108" rx="12" fill="url(#lgB)" stroke="#fff" stroke-width="4"/>
+            <text x="0" y="16" text-anchor="middle" font-size="52" font-weight="900" fill="#fff" font-family="inherit">3</text>
+            <circle cx="24" cy="-38" r="6" fill="#ffffff88"/>
+          </g>
+          <g transform="translate(160 88)">
+            <circle r="34" fill="#ffd166" stroke="#fff" stroke-width="4"/>
+            <text y="12" text-anchor="middle" font-size="30" font-weight="900" fill="#7a4c00">VS</text>
+          </g>
+        </svg>
+      </div>
+      <h1 class="game-title">Number <span>Clash</span></h1>
+      <p class="tagline">Two teams · Two cards · Biggest sum takes the point</p>
+    </div>
+
+    <div class="home-buttons">
+      <button class="btn btn-primary btn-big" id="btn-create">🎪 Create Room</button>
+      <button class="btn btn-secondary btn-big" id="btn-join">📲 Join with Code</button>
+      <button class="btn btn-ghost btn-big" id="btn-hotseat">🎮 One Device (Pass &amp; Play)</button>
+      <button class="btn btn-ghost btn-big" id="btn-tutorial">📖 How to Play</button>
+    </div>
+    <p class="footnote">Free to host · No accounts · Works on phones</p>
+  </section>
+
+  <!-- ============ JOIN ============ -->
+  <section id="screen-join" class="screen">
+    <button class="btn btn-back" data-back>← Back</button>
+    <div class="panel narrow">
+      <h2>Join a room</h2>
+      <p class="muted">Ask the host for the 6-letter room code (or scan their QR code with your camera app).</p>
+      <input id="join-code" class="input-code" maxlength="6" placeholder="ABC123" autocomplete="off" autocapitalize="characters">
+      <input id="join-name" class="input-text" maxlength="20" placeholder="Your name (optional)">
+      <button class="btn btn-primary btn-big" id="btn-join-go">Join room</button>
+      <p id="join-status" class="status-line"></p>
+    </div>
+  </section>
+
+  <!-- ============ LOBBY ============ -->
+  <section id="screen-lobby" class="screen">
+    <button class="btn btn-back" id="btn-lobby-leave">← Leave</button>
+    <div class="lobby-wrap">
+      <div class="panel room-panel" id="room-panel">
+        <h2>Room code</h2>
+        <div class="room-code" id="room-code">······</div>
+        <div id="qr-box" class="qr-box"></div>
+        <p class="muted small">Team 2 opens this page and taps <b>Join with Code</b>, or scans the QR to jump straight in.</p>
+        <p id="net-status" class="status-line"></p>
+      </div>
+
+      <div class="teams-row">
+        <div class="panel team-panel team-a" id="lobby-team-A">
+          <div class="team-head">
+            <span class="team-dot dot-a"></span>
+            <input class="team-name-input" id="name-A" maxlength="16" value="Team Phoenix">
+          </div>
+          <div class="roster" id="roster-A"></div>
+          <p class="muted small">Up to 6 players — play order follows this list.</p>
+        </div>
+        <div class="panel team-panel team-b" id="lobby-team-B">
+          <div class="team-head">
+            <span class="team-dot dot-b"></span>
+            <input class="team-name-input" id="name-B" maxlength="16" value="Team Dragon">
+          </div>
+          <div class="roster" id="roster-B"></div>
+          <p class="muted small" id="roster-B-hint">Up to 6 players — play order follows this list.</p>
+        </div>
+      </div>
+
+      <div class="panel settings-panel" id="settings-panel">
+        <h3>⏱ Timers <span class="muted small">(host controls)</span></h3>
+        <div class="settings-grid">
+          <label>Discussion <select id="set-discuss">
+            <option value="30">30 s</option><option value="45">45 s</option>
+            <option value="60" selected>60 s</option><option value="90">90 s</option>
+            <option value="120">2 min</option>
+          </select></label>
+          <label>Pick cards <select id="set-pick">
+            <option value="15">15 s</option><option value="20">20 s</option>
+            <option value="30" selected>30 s</option><option value="45">45 s</option>
+            <option value="60">60 s</option>
+          </select></label>
+          <label>Game limit <select id="set-total">
+            <option value="10">10 min</option><option value="15">15 min</option>
+            <option value="20" selected>20 min</option><option value="30">30 min</option>
+            <option value="45">45 min</option>
+          </select></label>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-big" id="btn-start" disabled>Start game</button>
+      <p class="muted small center" id="start-hint"></p>
+    </div>
+  </section>
+
+  <!-- ============ TUTORIAL ============ -->
+  <section id="screen-tutorial" class="screen">
+    <button class="btn btn-back" data-back>← Back</button>
+    <div class="tutorial-wrap">
+      <div class="tut-slide-box" id="tut-slide-box"></div>
+      <div class="tut-dots" id="tut-dots"></div>
+      <div class="tut-nav">
+        <button class="btn btn-secondary" id="tut-prev">← Prev</button>
+        <button class="btn btn-primary" id="tut-next">Next →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GAME ============ -->
+  <section id="screen-game" class="screen">
+    <header class="game-topbar">
+      <div class="score-chip chip-a"><span class="team-dot dot-a"></span><span id="hud-name-A">A</span><b id="hud-score-A">0</b></div>
+      <div class="round-box">
+        <div class="round-label">Round <span id="hud-round">1</span>/12</div>
+        <div class="phase-timer" id="phase-timer">—</div>
+        <div class="totalbar"><div class="totalbar-fill" id="totalbar-fill"></div></div>
+        <div class="clocks"><span id="clock-A" class="clock ca">0:00</span><span id="clock-B" class="clock cb">0:00</span></div>
+      </div>
+      <div class="score-chip chip-b"><b id="hud-score-B">0</b><span id="hud-name-B">B</span><span class="team-dot dot-b"></span></div>
+    </header>
+
+    <div class="game-stage">
+      <!-- opponent area -->
+      <div class="opp-area">
+        <div class="opp-info"><span id="opp-label">Opponent</span> · <span id="opp-count">14</span> cards
+          <span id="opp-hidden-badge" class="hidden-badge" title="Hidden advantage still available">🎭</span></div>
+        <div class="opp-cards" id="opp-cards"></div>
+      </div>
+
+      <!-- center table -->
+      <div class="table-area" id="table-area">
+        <div class="phase-banner" id="phase-banner"></div>
+        <div class="reveal-zone" id="reveal-zone"></div>
+      </div>
+
+      <!-- my area -->
+      <div class="my-area">
+        <div class="my-info">
+          <span id="my-label" class="my-label">Your team</span>
+          <span class="lead-chip" id="lead-chip">🎯 Lead: <b id="lead-name">—</b></span>
+          <span id="my-hidden-badge" class="hidden-badge">🎭</span>
+        </div>
+        <div class="hand" id="hand"></div>
+        <div class="action-row" id="action-row">
+          <label class="hidden-toggle" id="hidden-toggle-wrap">
+            <input type="checkbox" id="hidden-toggle"> 🎭 Use hidden advantage
+          </label>
+          <button class="btn btn-primary" id="btn-submit" disabled>Play cards</button>
+          <button class="btn btn-secondary" id="btn-ready">✔ We're ready</button>
+        </div>
+        <p class="muted small" id="my-hint"></p>
+      </div>
+    </div>
+
+    <!-- pass-device overlay for hotseat -->
+    <div class="overlay" id="pass-overlay">
+      <div class="overlay-card">
+        <div class="overlay-emoji" id="pass-emoji">📱</div>
+        <h2 id="pass-title">Pass the device</h2>
+        <p id="pass-text"></p>
+        <button class="btn btn-primary btn-big" id="pass-continue">We're ready — show our cards</button>
+      </div>
+    </div>
+
+    <!-- round result overlay -->
+    <div class="overlay" id="result-overlay">
+      <div class="overlay-card wide" id="result-card"></div>
+    </div>
+  </section>
+
+  <!-- ============ GAME OVER ============ -->
+  <section id="screen-over" class="screen">
+    <div class="panel narrow over-panel" id="over-panel"></div>
+  </section>
+
+  <!-- toast -->
+  <div id="toast" class="toast"></div>
+</div>
+
+<script src="assets/vendor/qrcode.min.js"></script>
+<script src="assets/vendor/peerjs.min.js"></script>
+<script src="assets/tutorial.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
