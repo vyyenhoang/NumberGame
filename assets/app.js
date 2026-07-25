@@ -420,21 +420,29 @@ function hostRoom(attempt = 0) {
   });
   peer.on("connection", (conn) => {
     conn.on("open", () => {
-      let team = "spec";
-      if (!G.teams.B.connected) { team = "B"; G.teams.B.connected = true; }
-      conns.set(conn, { team, name: "" });
-      conn.send({ t: "welcome", team, code: roomCode });
-      if (team === "B") {
-        toast("🎉 Team 2 joined!");
-        $("#net-status").textContent = "✅ Both teams connected. Fill rosters and start!";
-      } else toast("👀 A spectator joined");
-      pushState();
+      // role is assigned when the client introduces itself (hello), so a
+      // big-screen viewer never takes the Team 2 slot
+      conns.set(conn, { team: null, name: "" });
     });
     conn.on("data", (m) => {
       const meta = conns.get(conn);
       if (!meta) return;
-      if (m && m.t === "hello") { meta.name = String(m.name || "").slice(0, 20); return; }
-      if (m && m.t === "act" && meta.team !== "spec") applyAction(meta.team, m.a || {});
+      if (m && m.t === "hello") {
+        meta.name = String(m.name || "").slice(0, 20);
+        if (meta.team === null) {
+          let team = "spec";
+          if (m.role !== "viewer" && !G.teams.B.connected) { team = "B"; G.teams.B.connected = true; }
+          meta.team = team;
+          conn.send({ t: "welcome", team, code: roomCode });
+          if (team === "B") {
+            toast("🎉 Team 2 joined!");
+            $("#net-status").textContent = "✅ Both teams connected. Fill rosters and start!";
+          } else toast(m.role === "viewer" ? "📺 A big-screen viewer joined" : "👀 A spectator joined");
+          pushState();
+        }
+        return;
+      }
+      if (m && m.t === "act" && meta.team && meta.team !== "spec") applyAction(meta.team, m.a || {});
     });
     conn.on("close", () => {
       const meta = conns.get(conn);
@@ -455,7 +463,7 @@ function hostRoom(attempt = 0) {
   tickInt = setInterval(() => { engineTick(); }, 400);
 }
 
-function joinRoom(code, name) {
+function joinRoom(code, name, asViewer) {
   destroyNet();
   mode = "client"; myTeam = null;
   roomCode = code;
@@ -467,7 +475,7 @@ function joinRoom(code, name) {
     hostConn = peer.connect(PEER_PREFIX + code, { reliable: true });
     hostConn.on("open", () => {
       opened = true;
-      hostConn.send({ t: "hello", name });
+      hostConn.send({ t: "hello", name, role: asViewer ? "viewer" : "player" });
       st.textContent = "Connected! Waiting for game data…";
     });
     hostConn.on("data", onClientData);
@@ -498,7 +506,7 @@ function onClientData(m) {
   if (m.t === "welcome") {
     myTeam = m.team === "spec" ? null : m.team;
     renderRoomCode();
-    toast(myTeam ? `You are ${myTeam === "A" ? "Team 1" : "Team 2"}'s device` : "You joined as a spectator");
+    toast(myTeam ? `You are ${myTeam === "A" ? "Team 1" : "Team 2"}'s device` : "📺 Viewer mode — scores only, no cards");
     return;
   }
   if (m.t === "state") {
@@ -840,6 +848,8 @@ function renderOver() {
   $("#btn-over-home").onclick = () => { leaveToHome(); };
 }
 
+function isViewer() { return mode === "client" && myTeam === null; }
+
 function render() {
   if (!V) return;
   if (V.phase !== lastPhase) {
@@ -855,40 +865,113 @@ function render() {
   } else if (V.phase === "over") {
     if (!$("#screen-over").classList.contains("active")) show("#screen-over");
     renderOver();
+  } else if (isViewer()) {
+    if (!$("#screen-viewer").classList.contains("active")) show("#screen-viewer");
+    renderViewer();
   } else {
     if (!$("#screen-game").classList.contains("active")) { sel = []; show("#screen-game"); }
     renderGame();
   }
 }
 
+/* ---------------- big-screen viewer ---------------- */
+function renderViewer() {
+  const v = V;
+  $("#v-round").textContent = v.round;
+  const phaseLabel = { discuss: "💬 Discussion", pick: "🃏 Picking cards", reveal: "✨ Reveal!" }[v.phase] || "";
+  $("#v-phase-label").textContent = phaseLabel;
+  for (const t of ["A", "B"]) {
+    const T = v.teams[t];
+    $("#v-name-" + t).textContent = T.name;
+    $("#v-score-" + t).textContent = T.score;
+    $("#v-meta-" + t).innerHTML =
+      `🂠 ${T.handCount ?? "?"} cards · ${T.hiddenLeft > 0 ? "🎭 hidden ready" : "🎭 <s>used</s>"}<br>🎯 Lead: <b>${esc(leadOf(v, t))}</b>`;
+    const st = $("#v-status-" + t);
+    st.classList.remove("locked", "win");
+    if (v.phase === "discuss") {
+      st.textContent = T.ready ? "Ready ✔" : "Discussing…";
+      if (T.ready) st.classList.add("locked");
+    } else if (v.phase === "pick") {
+      st.textContent = T.pick ? "Locked in ✔" : "Picking…";
+      if (T.pick) st.classList.add("locked");
+    } else if (v.phase === "reveal" && v.lastRound) {
+      if (v.lastRound.winner === t) { st.textContent = "🏆 Round won!"; st.classList.add("win"); }
+      else st.textContent = v.lastRound.winner ? "Round lost" : "Tie round";
+    } else st.textContent = "—";
+  }
+  // center stage
+  const c = $("#v-center");
+  if (v.phase === "discuss") {
+    c.innerHTML = `<div class="big-emoji">💬</div><div class="v-msg">Teams are talking strategy…</div><div class="v-sub">then each picks 2 cards — bigger sum takes the point</div>`;
+  } else if (v.phase === "pick") {
+    const backs = (t) => `<div class="side"><div class="cards-row">
+        <div class="card back">?</div><div class="card back">?</div></div>
+        <div class="v-sub">${esc(v.teams[t].name)}${v.teams[t].pick ? " ✔" : "…"}</div></div>`;
+    c.innerHTML = `<div class="v-msg">Cards are being chosen</div><div class="v-play">${backs("A")}${backs("B")}</div>`;
+  } else if (v.phase === "reveal" && v.lastRound) {
+    const lr = v.lastRound;
+    const side = (t, cls) => {
+      const s = lr.sides[t];
+      const body = s.masked
+        ? `<div class="cards-row"><div class="card back">?</div><div class="card back">?</div></div><div class="sum">🎭 ? + ?</div>`
+        : `<div class="cards-row">${s.cards.map((n) => `<div class="card ${cls}">${n}</div>`).join("")}</div><div class="sum">${s.cards[0]} + ${s.cards[1]} = ${s.sum}</div>`;
+      return `<div class="side">${body}<div class="v-sub">${esc(v.teams[t].name)}</div></div>`;
+    };
+    const title = lr.winner ? `🏆 ${esc(v.teams[lr.winner].name)} takes round ${lr.round}!` : `🤝 Round ${lr.round} is a tie`;
+    const exch = ["A", "B"].map((t) => {
+      const s = lr.sides[t];
+      return `${esc(v.teams[t].name)} passes a <b>${s.gaveVal}</b> across${s.masked || s.hidden ? " 🎭" : ` and discards the ${s.discVal}`}`;
+    }).join(" · ");
+    c.innerHTML = `<div class="v-msg">${title}</div><div class="v-play">${side("A", "ca")}${side("B", "cb")}</div><div class="v-exchange">🔁 ${exch}</div>`;
+  }
+}
+
 /* ---------------- live timer UI (runs everywhere) ---------------- */
 function uiTick() {
-  if (!V || !$("#screen-game").classList.contains("active")) return;
+  if (!V) return;
+  const gameActive = $("#screen-game").classList.contains("active");
+  const viewerActive = $("#screen-viewer").classList.contains("active");
+  if (!gameActive && !viewerActive) return;
   const t = hostNow();
-  const el = $("#phase-timer");
+
+  // phase timer text
+  let timerTxt, hurry = false;
   if (V.phaseEndsAt) {
     const remain = Math.max(0, V.phaseEndsAt - t);
-    el.textContent = fmtClock(remain);
-    el.classList.toggle("hurry", remain < 10000 && (V.phase === "discuss" || V.phase === "pick"));
+    timerTxt = fmtClock(remain);
+    hurry = remain < 10000 && (V.phase === "discuss" || V.phase === "pick");
   } else {
-    el.textContent = V.phase === "pick" ? (V.settings.pickSec <= 0 ? "∞" : "⏸") : "—";
-    el.classList.remove("hurry");
+    timerTxt = V.phase === "pick" ? (V.settings.pickSec <= 0 ? "∞" : "⏸") : "—";
   }
-  // total bar (hidden when no game limit)
-  if (V.startedAt && V.settings.totalMin > 0) {
-    const frac = Math.min(1, (t - V.startedAt) / (V.settings.totalMin * 60000));
-    $("#totalbar-fill").style.width = (frac * 100).toFixed(1) + "%";
-  } else {
-    $("#totalbar-fill").style.width = "0%";
-  }
+  // total bar fraction (0 when no game limit)
+  const frac = V.startedAt && V.settings.totalMin > 0
+    ? Math.min(1, (t - V.startedAt) / (V.settings.totalMin * 60000)) : 0;
   // team clocks (live accrual while picking)
+  const clock = {};
   for (const k of ["A", "B"]) {
     let ms = V.teams[k].timeMs;
     if (V.phase === "pick" && V.pickStartAt && V.pickStartAt[k] && !V.teams[k].pick) ms += t - V.pickStartAt[k];
-    $("#clock-" + k).textContent = "⏱" + fmtClock(ms);
+    clock[k] = "⏱" + fmtClock(ms);
   }
-  const cd = $("#reveal-cd");
-  if (cd && V.phaseEndsAt) cd.textContent = Math.max(0, Math.ceil((V.phaseEndsAt - t) / 1000));
+
+  if (gameActive) {
+    const el = $("#phase-timer");
+    el.textContent = timerTxt;
+    el.classList.toggle("hurry", hurry);
+    $("#totalbar-fill").style.width = (frac * 100).toFixed(1) + "%";
+    $("#clock-A").textContent = clock.A;
+    $("#clock-B").textContent = clock.B;
+    const cd = $("#reveal-cd");
+    if (cd && V.phaseEndsAt) cd.textContent = Math.max(0, Math.ceil((V.phaseEndsAt - t) / 1000));
+  }
+  if (viewerActive) {
+    const el = $("#v-timer");
+    el.textContent = timerTxt;
+    el.classList.toggle("hurry", hurry);
+    $("#v-totalbar").style.width = (frac * 100).toFixed(1) + "%";
+    $("#v-clock-A").textContent = clock.A;
+    $("#v-clock-B").textContent = clock.B;
+  }
 }
 
 /* ============================================================
@@ -986,7 +1069,7 @@ function init() {
   $("#btn-join-go").onclick = () => {
     const code = $("#join-code").value.trim().toUpperCase();
     if (code.length !== 6) { $("#join-status").textContent = "Code must be 6 characters."; $("#join-status").classList.add("err"); return; }
-    joinRoom(code, $("#join-name").value.trim());
+    joinRoom(code, $("#join-name").value.trim(), $("#join-viewer").checked);
   };
   $("#join-code").addEventListener("input", (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); });
 

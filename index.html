@@ -62,6 +62,7 @@
       <p class="muted">Ask the host for the 6-letter room code (or scan their QR code with your camera app).</p>
       <input id="join-code" class="input-code" maxlength="6" placeholder="ABC123" autocomplete="off" autocapitalize="characters">
       <input id="join-name" class="input-text" maxlength="20" placeholder="Your name (optional)">
+      <label class="viewer-check"><input type="checkbox" id="join-viewer"> 📺 Join as big-screen viewer <span class="muted small">— shows scores &amp; rounds, never the cards. Cast this to your TV!</span></label>
       <button class="btn btn-primary btn-big" id="btn-join-go">Join room</button>
       <p id="join-status" class="status-line"></p>
     </div>
@@ -75,7 +76,7 @@
         <h2>Room code</h2>
         <div class="room-code" id="room-code">······</div>
         <div id="qr-box" class="qr-box"></div>
-        <p class="muted small">Team 2 opens this page and taps <b>Join with Code</b>, or scans the QR to jump straight in.</p>
+        <p class="muted small">Team 2 opens this page and taps <b>Join with Code</b>, or scans the QR to jump straight in.<br>📺 Extra devices can join as <b>big-screen viewers</b> (scores only, no cards) — perfect for casting to a TV.</p>
         <p id="net-status" class="status-line"></p>
       </div>
 
@@ -200,6 +201,34 @@
     <div class="overlay" id="result-overlay">
       <div class="overlay-card wide" id="result-card"></div>
     </div>
+  </section>
+
+  <!-- ============ BIG-SCREEN VIEWER ============ -->
+  <section id="screen-viewer" class="screen">
+    <header class="viewer-top">
+      <div class="v-round">Round <span id="v-round">1</span><small>/12</small></div>
+      <div class="v-timer" id="v-timer">—</div>
+      <div class="v-phase" id="v-phase-label">—</div>
+      <div class="totalbar v-totalbar"><div class="totalbar-fill" id="v-totalbar"></div></div>
+    </header>
+    <div class="viewer-teams">
+      <div class="v-team v-team-a">
+        <div class="v-name" id="v-name-A">Team 1</div>
+        <div class="v-score" id="v-score-A">0</div>
+        <div class="v-clock ca" id="v-clock-A">⏱0:00</div>
+        <div class="v-meta" id="v-meta-A"></div>
+        <div class="v-status" id="v-status-A"></div>
+      </div>
+      <div class="v-center" id="v-center"></div>
+      <div class="v-team v-team-b">
+        <div class="v-name" id="v-name-B">Team 2</div>
+        <div class="v-score" id="v-score-B">0</div>
+        <div class="v-clock cb" id="v-clock-B">⏱0:00</div>
+        <div class="v-meta" id="v-meta-B"></div>
+        <div class="v-status" id="v-status-B"></div>
+      </div>
+    </div>
+    <p class="footnote">📺 Viewer mode — cards stay secret on each team's own device</p>
   </section>
 
   <!-- ============ GAME OVER ============ -->
